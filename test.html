@@ -1,6 +1,49 @@
-<label for="picture">Take a picture of your face:</label>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Camera Capture</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
 
-<input type="file"
-       name="picture"
-       accept="image/*"
-       capture="user">
+    h1 {
+      text-align: center;
+    }
+
+    #loadingIndicator {
+      text-align: center;
+      display: none;
+    }
+
+    #resultContainer {
+      text-align: center;
+      display: none;
+      margin-top: 20px;
+    }
+
+    #actorName {
+      font-size: 24px;
+    }
+
+    #imdbLink {
+      color: #4CAF50;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Camera Capture</h1>
+  <label for="picture">Take a photo of an actor in your TV:</label>
+  <input type="file" name="picture" accept="image/*" capture="user">
+  <div id="loadingIndicator">
+    <img src="loading.gif" alt="Loading..." />
+  </div>
+  <div id="resultContainer">
+    <h2 id="actorName"></h2>
+    <a id="imdbLink" href="#" target="_blank"></a>
+  </div>
+</body>
+</html>
