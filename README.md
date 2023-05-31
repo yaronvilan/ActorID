@@ -1,2 +1,2 @@
 # ActorID
-[Link]([url](https://yaronvilan.github.io/ActorID/test.html))
+[Link](https://yaronvilan.github.io/ActorID/test.html)
