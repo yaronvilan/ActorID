@@ -7,58 +7,50 @@
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 0;
-    }
-
-    h1 {
       text-align: center;
-      font-size: 48px; /* Increased font size */
     }
 
-    #loadingIndicator {
-      text-align: center;
-      display: none;
+    #captureButton {
+      display: block;
+      margin: 20px auto;
+      padding: 20px;
+      font-size: 24px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
-    #resultContainer {
-      text-align: center;
-      display: none;
-      margin-top: 20px;
-    }
-
-    #actorName {
-      font-size: 36px; /* Increased font size */
-    }
-
-    #imdbLink {
-      color: #4CAF50;
-      text-decoration: none;
-      font-size: 24px; /* Increased font size */
-    }
-
-    #photoContainer {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh; /* Set height to viewport height for full-screen display */
-    }
-
-    #photoContainer img {
+    #capturedImage {
       max-width: 100%;
-      max-height: 100%;
+      max-height: 100vh;
+      margin: 20px auto;
     }
   </style>
 </head>
 <body>
   <h1>Camera Capture</h1>
-  <label for="picture">Paparazzi your TV!:</label>
-  <input type="file" name="picture" accept="image/*" capture="user">
-  <div id="loadingIndicator">
-    <img src="loading.gif" alt="Loading..." />
-  </div>
-  <div id="resultContainer">
-    <h2 id="actorName"></h2>
-    <a id="imdbLink" href="#" target="_blank"></a>
-  </div>
-  <div id="photoContainer"></div> <!-- New container for displaying the photo -->
+  <input type="file" name="picture" accept="image/*" capture="user" id="captureInput">
+  <button id="captureButton">Snap an actor on TV!</button>
+  <img id="capturedImage">
+
+  <script>
+    // Get the capture button element
+    const captureButton = document.getElementById('captureButton');
+
+    // Get the captured image element
+    const capturedImage = document.getElementById('capturedImage');
+
+    // Function to handle captured image selection
+    function handleCapture(event) {
+      const file = event.target.files[0];
+      const imageURL = URL.createObjectURL(file);
+      capturedImage.src = imageURL;
+    }
+
+    // Add event listener for file selection
+    captureInput.addEventListener('change', handleCapture);
+  </script>
 </body>
 </html>
