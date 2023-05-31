@@ -3,10 +3,23 @@
 <head>
   <title>Camera Capture</title>
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
     #video {
       width: 100%;
       height: auto;
+      display: block;
+      margin: 20px auto;
     }
+
     #captureButton {
       display: block;
       margin: 20px auto;
@@ -18,12 +31,39 @@
       border-radius: 5px;
       cursor: pointer;
     }
+
+    #loadingIndicator {
+      text-align: center;
+      display: none;
+    }
+
+    #resultContainer {
+      text-align: center;
+      display: none;
+      margin-top: 20px;
+    }
+
+    #actorName {
+      font-size: 24px;
+    }
+
+    #imdbLink {
+      color: #4CAF50;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
   <h1>Camera Capture</h1>
   <video id="video" autoplay></video>
   <button id="captureButton">Capture Image</button>
+  <div id="loadingIndicator">
+    <img src="loading.gif" alt="Loading..." />
+  </div>
+  <div id="resultContainer">
+    <h2 id="actorName"></h2>
+    <a id="imdbLink" href="#" target="_blank"></a>
+  </div>
 
   <script>
     // Get the video element
@@ -31,6 +71,18 @@
 
     // Get the capture button
     const captureButton = document.getElementById('captureButton');
+
+    // Get the loading indicator
+    const loadingIndicator = document.getElementById('loadingIndicator');
+
+    // Get the result container
+    const resultContainer = document.getElementById('resultContainer');
+
+    // Get the actor name element
+    const actorNameElement = document.getElementById('actorName');
+
+    // Get the IMDb link element
+    const imdbLinkElement = document.getElementById('imdbLink');
 
     // Get user media constraints
     const constraints = { video: { facingMode: 'environment' }, audio: false };
@@ -48,6 +100,12 @@
 
     // Function to capture image from video stream
     function captureImage() {
+      // Show loading indicator
+      loadingIndicator.style.display = 'block';
+
+      // Disable capture button
+      captureButton.disabled = true;
+
       // Create a canvas element
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
@@ -61,22 +119,4 @@
       const dataURL = canvas.toDataURL('image/jpeg');
 
       // Perform further processing with the captured image dataURL
-      // For example, you can send it to a server for recognition or display it on the page
-
-      // Uncomment the line below to display the captured image in a new window
-      // window.open(dataURL);
-
-      // Log the dataURL in the console for demonstration purposes
-      console.log(dataURL);
-    }
-
-    // Attach click event listener to the capture button
-    captureButton.addEventListener('click', captureImage);
-
-    // Access the user media devices
-    navigator.mediaDevices.getUserMedia(constraints)
-      .then(handleSuccess)
-      .catch(handleError);
-  </script>
-</body>
-</html>
+      // For example, you can send it to a server for recognition or
