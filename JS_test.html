@@ -6,64 +6,44 @@
 <body>
   <h1>Actor Identification</h1>
   
-  <div id="camera">
-    <video id="video" width="100%" height="auto" autoplay muted playsinline></video>
-    <button id="capture-btn">Capture</button>
-  </div>
+  <input type="file" accept="image/*" id="photo-input">
+  <button id="upload-btn">Select Photo</button>
   
-  <canvas id="canvas" width="640" height="480" style="display: none;"></canvas>
+  <div id="image-container"></div>
   
   <script>
-    // Access the camera and display the video stream
-    function startVideo() {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(function(stream) {
-          var video = document.getElementById('video');
-          video.srcObject = stream;
-        })
-        .catch(function(err) {
-          console.error('Error accessing the camera: ', err);
-        });
+    var photoInput = document.getElementById('photo-input');
+    var uploadButton = document.getElementById('upload-btn');
+    var imageContainer = document.getElementById('image-container');
+    
+    uploadButton.addEventListener('click', function() {
+      photoInput.click();
+    });
+    
+    photoInput.addEventListener('change', function(event) {
+      var file = event.target.files[0];
+      var reader = new FileReader();
+      
+      reader.onload = function() {
+        var imageUrl = reader.result;
+        displayImage(imageUrl);
+        sendImageToServer(imageUrl);
+      };
+      
+      reader.readAsDataURL(file);
+    });
+    
+    function displayImage(imageUrl) {
+      var image = document.createElement('img');
+      image.src = imageUrl;
+      imageContainer.innerHTML = '';
+      imageContainer.appendChild(image);
     }
     
-    // Play the video once a user interaction occurs (e.g., button click)
-    var cameraDiv = document.getElementById('camera');
-    cameraDiv.addEventListener('click', function() {
-      var video = document.getElementById('video');
-      video.play();
-      
-      // Remove the event listener to prevent multiple plays
-      cameraDiv.removeEventListener('click', arguments.callee);
-    });
-    
-    // Capture the image from the video stream
-    var captureButton = document.getElementById('capture-btn');
-    captureButton.addEventListener('click', function() {
-      var video = document.getElementById('video');
-      var canvas = document.getElementById('canvas');
-      var context = canvas.getContext('2d');
-      
-      // Draw the current video frame onto the canvas
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Convert the canvas image to a data URL
-      var imageDataURL = canvas.toDataURL('image/png');
-      
-      // Pass the image data URL to the server for processing (to be implemented in Task 3)
-      sendImageToServer(imageDataURL);
-    });
-    
-    // Function to send the captured image to the server for processing (to be implemented in Task 3)
-    function sendImageToServer(imageData) {
-      // Implement this function to send the image data to the server
-      console.log('Image data:', imageData);
+    function sendImageToServer(imageUrl) {
+      // Implement this function to send the image URL to the server
+      console.log('Image URL:', imageUrl);
     }
-    
-    // Call startVideo() after a user interaction event, such as button click
-    var startButton = document.getElementById('start-btn');
-    startButton.addEventListener('click', function() {
-      startVideo();
-    });
   </script>
 </body>
 </html>
