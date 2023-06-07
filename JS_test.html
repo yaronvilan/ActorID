@@ -7,7 +7,7 @@
   <h1>Actor Identification</h1>
   
   <div id="camera">
-    <video id="video" width="100%" height="auto" autoplay playsinline></video>
+    <video id="video" width="100%" height="auto" autoplay muted playsinline></video>
     <button id="capture-btn">Capture</button>
   </div>
   
@@ -20,12 +20,21 @@
         .then(function(stream) {
           var video = document.getElementById('video');
           video.srcObject = stream;
-          video.play();
         })
         .catch(function(err) {
           console.error('Error accessing the camera: ', err);
         });
     }
+    
+    // Play the video once a user interaction occurs (e.g., button click)
+    var cameraDiv = document.getElementById('camera');
+    cameraDiv.addEventListener('click', function() {
+      var video = document.getElementById('video');
+      video.play();
+      
+      // Remove the event listener to prevent multiple plays
+      cameraDiv.removeEventListener('click', arguments.callee);
+    });
     
     // Capture the image from the video stream
     var captureButton = document.getElementById('capture-btn');
