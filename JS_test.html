@@ -7,7 +7,7 @@
   <h1>Actor Identification</h1>
   
   <div id="camera">
-    <video id="video" width="100%" height="auto"></video>
+    <video id="video" width="100%" height="auto" autoplay playsinline></video>
     <button id="capture-btn">Capture</button>
   </div>
   
@@ -15,15 +15,17 @@
   
   <script>
     // Access the camera and display the video stream
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(function(stream) {
-        var video = document.getElementById('video');
-        video.srcObject = stream;
-        video.play();
-      })
-      .catch(function(err) {
-        console.error('Error accessing the camera: ', err);
-      });
+    function startVideo() {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+          var video = document.getElementById('video');
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(function(err) {
+          console.error('Error accessing the camera: ', err);
+        });
+    }
     
     // Capture the image from the video stream
     var captureButton = document.getElementById('capture-btn');
@@ -44,21 +46,15 @@
     
     // Function to send the captured image to the server for processing (to be implemented in Task 3)
     function sendImageToServer(imageData) {
-      // Implement this function to send the image data to the server using AJAX or Fetch API
-      // You'll need to make a POST request to your web service endpoint for further processing
-      // You can use libraries like Axios or jQuery to simplify AJAX requests.
-      // Example: axios.post('/process-image', { image: imageData })
-      //   .then(function(response) {
-      //     // Handle the response from the server
-      //     console.log(response.data);
-      //   })
-      //   .catch(function(error) {
-      //     console.error('Error sending image to server: ', error);
-      //   });
-      
-      // For now, you can simply log the image data to the console
+      // Implement this function to send the image data to the server
       console.log('Image data:', imageData);
     }
+    
+    // Call startVideo() after a user interaction event, such as button click
+    var startButton = document.getElementById('start-btn');
+    startButton.addEventListener('click', function() {
+      startVideo();
+    });
   </script>
 </body>
 </html>
