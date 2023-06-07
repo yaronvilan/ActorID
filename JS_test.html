@@ -2,23 +2,29 @@
 <html>
 <head>
   <title>Actor Identification</title>
+  <style>
+    #image-container {
+      max-width: 100%;
+      max-height: 100vh;
+    }
+    
+    #image-container img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  </style>
 </head>
 <body>
   <h1>Actor Identification</h1>
   
   <input type="file" accept="image/*" id="photo-input">
-  <button id="upload-btn">Select Photo</button>
   
   <div id="image-container"></div>
   
   <script>
     var photoInput = document.getElementById('photo-input');
-    var uploadButton = document.getElementById('upload-btn');
     var imageContainer = document.getElementById('image-container');
-    
-    uploadButton.addEventListener('click', function() {
-      photoInput.click();
-    });
     
     photoInput.addEventListener('change', function(event) {
       var file = event.target.files[0];
