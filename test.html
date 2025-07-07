@@ -261,7 +261,6 @@
     </div>
 
     <div id="results"></div>
-    <div id="debug"></div>
   </div>
 
   <script>
@@ -270,7 +269,6 @@
     let preview = document.getElementById('preview');
     let placeholder = document.getElementById('placeholder');
     let status = document.getElementById('status');
-    let debug = document.getElementById('debug');
     let actorName = document.getElementById('actorName');
     let startBtn = document.getElementById('startBtn');
     let snapBtn = document.getElementById('snapBtn');
@@ -282,21 +280,10 @@
     let currentStream = null;
     let currentBlob = null;
     
-    // Debug logging
-    function log(message) {
-      console.log(message);
-      debug.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
-      debug.scrollTop = debug.scrollHeight;
-    }
-    
     // Check device
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
     const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
-    
-    log('📱 Device: ' + (isIOS ? 'iOS' : 'Desktop'));
-    log('🌐 Browser: ' + (isSafari ? 'Safari' : 'Other'));
-    log('🔒 Secure: ' + (isSecure ? 'Yes' : 'No'));
     
     // Check requirements
     if (isIOS && !isSecure) {
@@ -311,24 +298,38 @@
       startBtn.disabled = true;
     }
     
-    // Start camera button
+    // Start camera button - Fixed to prioritize back camera
     startBtn.onclick = async function() {
-      log('👆 Start button clicked');
-      
       startBtn.disabled = true;
       startBtn.textContent = '📱 Starting camera...';
       status.textContent = 'Requesting camera access...';
       status.className = '';
       
       try {
-        log('🎬 Requesting camera...');
+        // First try with exact back camera requirement
+        let stream = null;
         
-        // Simplest possible camera request
-        currentStream = await navigator.mediaDevices.getUserMedia({
-          video: true
-        });
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { exact: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        } catch (exactError) {
+          // If exact fails, fall back to ideal (more compatible)
+          console.log('Exact back camera failed, trying ideal:', exactError.message);
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+        }
         
-        log('✅ Camera stream obtained');
+        currentStream = stream;
         
         // Set up video
         video.srcObject = currentStream;
@@ -337,8 +338,6 @@
         
         // Wait for video to load
         video.onloadedmetadata = function() {
-          log('📺 Video loaded: ' + video.videoWidth + 'x' + video.videoHeight);
-          
           // Show snap button
           startBtn.classList.add('hidden');
           snapBtn.classList.remove('hidden');
@@ -351,7 +350,6 @@
         // Fallback - enable after 3 seconds
         setTimeout(function() {
           if (snapBtn.disabled && currentStream) {
-            log('⏰ Force enabling snap button');
             snapBtn.disabled = false;
             status.textContent = '📸 Camera ready - you can snap photos';
             status.className = 'success';
@@ -359,8 +357,6 @@
         }, 3000);
         
       } catch (err) {
-        log('❌ Camera failed: ' + err.name + ' - ' + err.message);
-        
         startBtn.disabled = false;
         startBtn.textContent = '❌ TRY AGAIN';
         
@@ -377,8 +373,6 @@
     
     // Snap photo
     snapBtn.onclick = function() {
-      log('📸 Snap button clicked');
-      
       try {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth || 640;
@@ -390,8 +384,6 @@
         // Convert to blob
         canvas.toBlob(function(blob) {
           if (blob) {
-            log('✅ Photo captured: ' + Math.round(blob.size / 1024) + 'KB');
-            
             currentBlob = blob;
             
             // Show preview
@@ -408,24 +400,20 @@
             status.textContent = '📸 Photo captured! Ready to analyze';
             status.className = 'success';
           } else {
-            log('❌ Failed to create blob');
             status.textContent = '❌ Failed to capture photo';
             status.className = 'error';
           }
         }, 'image/jpeg', 0.8);
         
       } catch (err) {
-        log('❌ Snap failed: ' + err.message);
         status.textContent = '❌ Failed to capture: ' + err.message;
         status.className = 'error';
       }
     };
     
-    // File upload
+    // File upload (hidden but functional)
     fileInput.onchange = function() {
       if (this.files[0]) {
-        log('📁 File uploaded: ' + Math.round(this.files[0].size / 1024) + 'KB');
-        
         currentBlob = this.files[0];
         
         // Show preview
@@ -446,18 +434,16 @@
         analyzeBtn.classList.remove('hidden');
         analyzeBtn.disabled = false;
         retakeBtn.classList.remove('hidden');
-        retakeBtn.textContent = '🔄 CHOOSE ANOTHER';
+        retakeBtn.textContent = '🔄 RETAKE';
         
         status.textContent = '📁 Photo uploaded! Ready to analyze';
         status.className = 'success';
       }
     };
     
-    // Analyze with AWS - Using a working method
+    // Analyze with AWS - Using demo data
     analyzeBtn.onclick = async function() {
       if (!currentBlob) return;
-      
-      log('🔍 Starting analysis...');
       
       analyzeBtn.disabled = true;
       analyzeBtn.textContent = '🎬 IDENTIFYING...';
@@ -465,11 +451,6 @@
       status.className = '';
       
       try {
-        // For now, simulate the AWS response since direct API calls need complex authentication
-        // In a real app, you'd use AWS SDK or a backend service
-        
-        log('🔍 Simulating AWS analysis...');
-        
         // Simulate processing time
         await new Promise(resolve => setTimeout(resolve, 2000));
         
@@ -494,8 +475,6 @@
         const selectedCelebs = mockResponse.CelebrityFaces.slice(0, numCelebs);
         
         const data = { CelebrityFaces: selectedCelebs };
-        
-        log('📥 Analysis complete: ' + data.CelebrityFaces?.length + ' celebrities found');
         
         if (data.CelebrityFaces && data.CelebrityFaces.length > 0) {
           // Show the first celebrity's name above the photo
@@ -559,7 +538,6 @@
         }
         
       } catch (err) {
-        log('❌ Analysis failed: ' + err.message);
         status.textContent = '❌ Analysis failed: ' + err.message;
         status.className = 'error';
       } finally {
@@ -570,8 +548,6 @@
     
     // Retake/restart
     retakeBtn.onclick = function() {
-      log('🔄 Retake button clicked');
-      
       // Reset UI
       preview.classList.add('hidden');
       actorName.classList.add('hidden');
@@ -597,8 +573,6 @@
         status.className = '';
       }
     };
-    
-    log('🎬 App ready!');
   </script>
 </body>
 </html>
