@@ -1,56 +1,893 @@
+<!-- actor-identifier-camera.html
+     Snap (or upload) → AWS Rekognition ➜ show celebrity names
+
+     iOS fix pack v2:  
+     • Wait for video metadata before enabling the snap button  
+     • Robust snapshot helper that works on Safari 15+ & older (no toBlob).  
+     • Fallback canvas size if video metadata is 0×0.  
+     • Clearer status + console logs for easier debugging.
+
+     SECURITY WARNING ⚠️ Never embed long‑lived AWS keys in client code.  
+     Use Cognito/STS, Lambda, or another backend for short‑lived credentials.
+-->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Camera Capture</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>🎬 Who's that Actor?</title>
   <style>
+    :root { 
+      --bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --fg: #ffffff; 
+      --accent: #3498db; 
+      --danger: #e74c3c;
+      --success: #27ae60;
+      --warning: #f39c12;
+    }
+    
     body {
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 2rem 1rem;
+      min-height: 100vh;
       margin: 0;
-      padding: 0;
+    }
+    
+    .container {
+      max-width: 500px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    h1 {
       text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      background: linear-gradient(45deg, #fff, #f0f0f0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
-
-    #captureButton {
-      display: block;
-      margin: 20px auto;
-      padding: 20px;
-      font-size: 24px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    #capturedImage {
+    
+    .hidden { display: none !important; }
+    
+    .camera-container {
+      width: 100%;
       max-width: 100%;
-      max-height: 100vh;
-      margin: 20px auto;
+      border-radius: 15px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.3);
+      margin-bottom: 1rem;
+      position: relative;
+      min-height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    #preview, video {
+      width: 100%;
+      height: auto;
+      max-height: 500px;
+      border-radius: 15px;
+      object-fit: cover;
+      display: block;
+    }
+    
+    video {
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    #preview {
+      border: 3px solid var(--success);
+      box-shadow: 0 4px 20px rgba(39, 174, 96, 0.3);
+    }
+    
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 1.5rem 0;
+    }
+    
+    button, label[for] {
+      padding: 0.75rem 1.25rem;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.3s ease;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+    
+    button:hover, label[for]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+    }
+    
+    button.success {
+      background: var(--success);
+      box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+    }
+    
+    button.danger {
+      background: var(--danger);
+      box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+    }
+    
+    input[type=file] { display: none; }
+    
+    #status {
+      font-size: 1rem;
+      min-height: 1.5rem;
+      text-align: center;
+      padding: 0.75rem;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 1rem 0;
+      font-weight: 500;
+    }
+    
+    #status.error {
+      color: var(--danger);
+      background: rgba(231, 76, 60, 0.2);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+    }
+    
+    #status.success {
+      color: var(--success);
+      background: rgba(39, 174, 96, 0.2);
+      border: 1px solid rgba(39, 174, 96, 0.3);
+    }
+    
+    #resultHeader {
+      text-align: center;
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin: 1.5rem 0 1rem 0;
+      color: var(--success);
+    }
+    
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0;
+    }
+    
+    li {
+      margin: 0.75rem 0;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      border-left: 4px solid var(--success);
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .confidence {
+      background: rgba(39, 174, 96, 0.2);
+      color: var(--success);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    
+    .aws-status {
+      background: rgba(46, 204, 113, 0.2);
+      border: 1px solid rgba(46, 204, 113, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .aws-status.warning {
+      background: rgba(241, 196, 15, 0.2);
+      border-color: rgba(241, 196, 15, 0.3);
+      color: var(--warning);
+    }
+    
+    @media (max-width: 600px) {
+      .controls {
+        flex-direction: column;
+      }
+      
+      button, label[for] {
+        width: 100%;
+        justify-content: center;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Camera Capture</h1>
-  <input type="file" name="picture" accept="image/*" capture="user" id="captureInput">
-  <button id="captureButton">Snap an actor on TV!</button>
-  <img id="capturedImage">
+  <div class="container">
+    <h1>🎬 Who's that Actor?</h1>
+    <p style="text-align: center; opacity: 0.9; margin-bottom: 1.5rem;">
+      Snap a photo of any actor on your TV screen and discover who they are!
+    </p>
+    
+    <div class="aws-status" id="awsStatus">
+      🚀 AWS Rekognition Ready - Live celebrity recognition enabled
+    </div>
 
-  <script>
-    // Get the capture button element
-    const captureButton = document.getElementById('captureButton');
+    <div class="camera-container">
+      <video id="video" autoplay muted playsinline></video>
+      <img id="preview" class="hidden" alt="Captured photo" />
+    </div>
 
-    // Get the captured image element
-    const capturedImage = document.getElementById('capturedImage');
+    <div class="controls">
+      <button id="switchCameraBtn" class="hidden">🔄 Switch Camera</button>
+      <button id="snapBtn" disabled>📸 Snap Photo</button>
+      <button id="uploadBtn">📂 Upload Instead</button>
+      <input type="file" id="fileInput" accept="image/*" />
+      <button id="analyseBtn" class="hidden" disabled>🔍 Identify Actor</button>
+      <button id="retakeBtn" class="hidden">🔄 Take Another</button>
+    </div>
 
-    // Function to handle captured image selection
-    function handleCapture(event) {
-      const file = event.target.files[0];
-      const imageURL = URL.createObjectURL(file);
-      capturedImage.src = imageURL;
+    <p id="status">📱 Starting camera automatically...</p>
+    <h2 id="resultHeader" class="hidden">🎉 Detected Celebrities</h2>
+    <ul id="results"></ul>
+  </div>
+
+  <script type="module">
+    import { RekognitionClient, RecognizeCelebritiesCommand } from "https://cdn.jsdelivr.net/npm/@aws-sdk/client-rekognition/+esm";
+
+    // 🔐 AWS credentials - Your actual credentials
+    const client = new RekognitionClient({
+      region: "us-east-1",
+      credentials: {
+        accessKeyId: "AKIAUKQE2T34QL66ITWW",
+        secretAccessKey: "lNlewkTQl1Jm9bp9NT5f95nRmFE41vyYOF/GnWV8",
+      }
+    });
+
+    // Elements
+    const video         = document.getElementById('video');
+    const previewImg    = document.getElementById('preview');
+    const switchCameraBtn = document.getElementById('switchCameraBtn');
+    const snapBtn       = document.getElementById('snapBtn');
+    const uploadBtn     = document.getElementById('uploadBtn');
+    const fileInput     = document.getElementById('fileInput');
+    const analyseBtn    = document.getElementById('analyseBtn');
+    const retakeBtn     = document.getElementById('retakeBtn');
+    const statusTxt     = document.getElementById('status');
+    const resultsUl     = document.getElementById('results');
+    const resultHdr     = document.getElementById('resultHeader');
+    const awsStatus     = document.getElementById('awsStatus');
+
+    let stream;         // MediaStream
+    let currentBlob;    // last captured/uploaded image
+    let availableCameras = [];
+    let currentCameraIndex = 0;
+
+    // Debug logging for iPhone Safari
+    function debugLog(message) {
+      console.log(message);
+      // Also show in UI for iPhone debugging
+      const debugDiv = document.getElementById('debugOutput') || (() => {
+        const div = document.createElement('div');
+        div.id = 'debugOutput';
+        div.style.cssText = `
+          background: rgba(0,0,0,0.8);
+          color: #00ff00;
+          padding: 0.5rem;
+          font-family: monospace;
+          font-size: 0.7rem;
+          max-height: 100px;
+          overflow-y: auto;
+          border-radius: 5px;
+          margin-top: 1rem;
+        `;
+        document.querySelector('.container').appendChild(div);
+        return div;
+      })();
+      
+      debugDiv.innerHTML += message + '<br>';
+      debugDiv.scrollTop = debugDiv.scrollHeight;
     }
 
-    // Add event listener for file selection
-    captureInput.addEventListener('change', handleCapture);
+    // Simple camera test for iPhone
+    async function testCameraAccess() {
+      debugLog('🧪 Testing basic camera access...');
+      
+      try {
+        // Most basic camera request
+        const testStream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: 320, height: 240 } 
+        });
+        
+        debugLog('✅ Basic camera access successful');
+        
+        // Test video element
+        video.srcObject = testStream;
+        video.classList.remove('hidden');
+        
+        video.onloadedmetadata = () => {
+          debugLog('✅ Video metadata loaded: ' + video.videoWidth + 'x' + video.videoHeight);
+          snapBtn.disabled = false;
+          statusTxt.textContent = '📸 Camera working! You can now snap photos.';
+          statusTxt.className = 'success';
+        };
+        
+        // Force enable button after 2 seconds
+        setTimeout(() => {
+          if (snapBtn.disabled) {
+            debugLog('⏰ Force enabling snap button');
+            snapBtn.disabled = false;
+            statusTxt.textContent = '📸 Camera ready (forced) - try snapping!';
+            statusTxt.className = 'success';
+          }
+        }, 2000);
+        
+        return testStream;
+        
+      } catch (err) {
+        debugLog('❌ Camera test failed: ' + err.name + ' - ' + err.message);
+        throw err;
+      }
+    }
+
+    // Simplified camera initialization for iPhone
+    async function initializeCameraSimple() {
+      debugLog('🚀 Starting simple camera init...');
+      
+      try {
+        // Check browser support
+        if (!navigator.mediaDevices) {
+          throw new Error('MediaDevices not supported');
+        }
+        
+        if (!navigator.mediaDevices.getUserMedia) {
+          throw new Error('getUserMedia not supported');
+        }
+        
+        debugLog('✅ Browser supports camera API');
+        
+        // Test basic camera access
+        stream = await testCameraAccess();
+        
+        debugLog('✅ Camera initialization complete');
+        
+      } catch (err) {
+        debugLog('❌ Camera init failed: ' + err.name + ' - ' + err.message);
+        
+        statusTxt.innerHTML = `
+          ❌ Camera failed: ${err.message}<br><br>
+          <strong>iPhone Safari troubleshooting:</strong><br>
+          1. Make sure you're using HTTPS (not HTTP)<br>
+          2. Settings → Safari → Camera → Allow<br>
+          3. Close all Safari tabs and reopen<br>
+          4. Restart Safari completely<br>
+          5. Try Chrome or Firefox instead<br><br>
+          <small>Debug info above shows details ↑</small>
+        `;
+        statusTxt.className = 'error';
+        
+        // Show upload option as fallback
+        uploadBtn.style.display = 'block';
+        uploadBtn.textContent = '📂 Upload Photo Instead';
+      }
+    }
+
+    // Open camera function with iOS-specific handling
+    async function openCamera() {
+      try {
+        // Close existing stream
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+        }
+        
+        statusTxt.textContent = '📱 Starting camera...';
+        statusTxt.className = '';
+        
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        // iOS-specific camera configurations
+        const configurations = isIOS ? [
+          // iOS prefers simpler constraints
+          {
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          {
+            video: {
+              facingMode: 'user',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          },
+          { video: { facingMode: 'environment' } },
+          { video: { facingMode: 'user' } },
+          { video: true }
+        ] : [
+          // Desktop configurations
+          {
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            }
+          },
+          ...(availableCameras.length > 0 ? [{
+            video: {
+              deviceId: availableCameras[currentCameraIndex].deviceId,
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            }
+          }] : []),
+          {
+            video: {
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            }
+          },
+          { video: true }
+        ];
+        
+        let cameraStarted = false;
+        let lastError = null;
+        
+        for (const config of configurations) {
+          try {
+            console.log('Trying camera config:', config);
+            stream = await navigator.mediaDevices.getUserMedia(config);
+            cameraStarted = true;
+            console.log('✅ Camera config succeeded');
+            break;
+          } catch (err) {
+            console.log('Camera config failed:', err.name, err.message);
+            lastError = err;
+            continue;
+          }
+        }
+        
+        if (!cameraStarted) {
+          throw lastError || new Error('No camera configuration worked');
+        }
+        
+        console.log('✅ Camera stream started');
+        video.srcObject = stream;
+        video.classList.remove('hidden');
+        previewImg.classList.add('hidden');
+        
+        statusTxt.textContent = '🎥 Loading camera feed...';
+        
+        // Wait for video to be ready
+        video.onloadedmetadata = () => {
+          console.log('📹 Camera ready:', video.videoWidth, 'x', video.videoHeight);
+          snapBtn.disabled = false;
+          statusTxt.textContent = '📸 Point at TV screen and tap "Snap Photo"!';
+          statusTxt.className = 'success';
+        };
+        
+        // iOS needs more time to load
+        const timeout = isIOS ? 5000 : 3000;
+        setTimeout(() => {
+          if (snapBtn.disabled && stream) {
+            console.log('⏰ Metadata timeout, enabling snap button anyway');
+            snapBtn.disabled = false;
+            statusTxt.textContent = '📸 Camera ready - tap "Snap Photo"!';
+            statusTxt.className = 'success';
+          }
+        }, timeout);
+        
+      } catch (err) {
+        console.error('Camera error:', err);
+        
+        // Specific error handling for iOS
+        if (err.name === 'NotAllowedError') {
+          statusTxt.textContent = '🚫 Camera permission denied. Please allow camera access in Safari settings.';
+        } else if (err.name === 'NotFoundError') {
+          statusTxt.textContent = '📷 No camera found. Please check your device.';
+        } else if (err.name === 'NotReadableError') {
+          statusTxt.textContent = '📱 Camera busy. Close other apps using camera and try again.';
+        } else {
+          statusTxt.textContent = '❌ Camera failed: ' + err.message;
+        }
+        
+        statusTxt.className = 'error';
+        addManualCameraButton('📷 Try Again');
+        throw err;
+      }
+    }
+
+    // Check AWS credentials status
+    function checkAWSStatus() {
+      const hasCredentials = client.config.credentials.accessKeyId !== "YOUR_AWS_ACCESS_KEY_ID";
+      
+      if (hasCredentials) {
+        awsStatus.textContent = "🚀 AWS Rekognition Ready - Live celebrity recognition enabled";
+        awsStatus.className = "aws-status";
+      } else {
+        awsStatus.textContent = "⚠️ Please add your AWS credentials to enable celebrity recognition";
+        awsStatus.className = "aws-status warning";
+      }
+    }
+
+    // ——— Camera controls ———
+    
+    // Switch camera function
+    switchCameraBtn.addEventListener('click', async () => {
+      if (availableCameras.length > 1) {
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+        console.log('🔄 Switching to camera:', currentCameraIndex);
+        await openCamera();
+      }
+    });
+
+    // Upload button
+    uploadBtn.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    // ——— Universal snapshot helper (returns Promise<Blob>) ———
+    async function takeSnapshot() {
+      const w = video.videoWidth  || 640;
+      const h = video.videoHeight || 480;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+      
+      return new Promise((resolve, reject) => {
+        if (canvas.toBlob) {
+          canvas.toBlob(b => b ? resolve(b) : reject(new Error('Snapshot failed')), 'image/jpeg', 0.85);
+        } else {
+          // Fallback for very old Safari (< 11)
+          const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+          fetch(dataURL).then(r => r.blob()).then(resolve).catch(reject);
+        }
+      });
+    }
+
+    snapBtn.addEventListener('click', async () => {
+      try {
+        snapBtn.disabled = true;
+        statusTxt.textContent = '📸 Capturing photo...';
+        statusTxt.className = '';
+        
+        // Take the snapshot
+        currentBlob = await takeSnapshot();
+        console.log('📷 Photo captured:', (currentBlob.size / 1024).toFixed(1), 'KB');
+        
+        // Update status
+        statusTxt.textContent = '✅ Photo captured! Processing...';
+        statusTxt.className = 'success';
+        
+        // Show the captured image
+        showCapturedPhoto(currentBlob);
+        
+      } catch (err) {
+        console.error('Snapshot error:', err);
+        showError('Photo capture failed. Please try again.');
+        snapBtn.disabled = false;
+      }
+    });
+
+    // Show captured photo
+    function showCapturedPhoto(blob) {
+      // Hide video, show preview image
+      video.classList.add('hidden');
+      previewImg.classList.remove('hidden');
+      
+      // Display the captured image
+      previewImg.src = URL.createObjectURL(blob);
+      previewImg.onload = () => {
+        URL.revokeObjectURL(previewImg.src);
+        console.log('📸 Photo displayed successfully');
+      };
+      
+      // Update UI buttons
+      snapBtn.classList.add('hidden');
+      switchCameraBtn.classList.add('hidden');
+      uploadBtn.classList.add('hidden');
+      analyseBtn.classList.remove('hidden');
+      analyseBtn.disabled = false;
+      retakeBtn.classList.remove('hidden');
+      
+      // Update status
+      statusTxt.textContent = '📸 Photo ready! Tap "Identify Actor" to analyze.';
+      statusTxt.className = 'success';
+    }
+
+    // Retake photo
+    retakeBtn.addEventListener('click', () => {
+      // Show video again
+      video.classList.remove('hidden');
+      previewImg.classList.add('hidden');
+      
+      // Reset buttons
+      snapBtn.classList.remove('hidden');
+      snapBtn.disabled = false;
+      if (availableCameras.length > 1) {
+        switchCameraBtn.classList.remove('hidden');
+      }
+      uploadBtn.classList.remove('hidden');
+      analyseBtn.classList.add('hidden');
+      retakeBtn.classList.add('hidden');
+      
+      // Clear results
+      resultsUl.innerHTML = '';
+      resultHdr.classList.add('hidden');
+      
+      statusTxt.textContent = '📸 Point at TV screen and tap "Snap Photo"!';
+      statusTxt.className = 'success';
+    });
+
+    // ——— Handle file upload ———
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) {
+        currentBlob = fileInput.files[0];
+        console.log('📁 File uploaded:', (currentBlob.size / 1024).toFixed(1), 'KB');
+        showCapturedPhoto(currentBlob);
+      }
+    });
+
+    // ——— AWS Rekognition Celebrity Recognition ———
+    analyseBtn.addEventListener('click', async () => {
+      if (!currentBlob) return;
+      
+      analyseBtn.disabled = true;
+      statusTxt.textContent = '📤 Uploading image to AWS...';
+      statusTxt.className = '';
+      resultsUl.innerHTML = '';
+      resultHdr.classList.add('hidden');
+
+      try {
+        // Show uploading status
+        setTimeout(() => {
+          if (analyseBtn.disabled) {
+            statusTxt.textContent = '🔍 Analyzing with AWS Rekognition...';
+          }
+        }, 1000);
+
+        const bytes = new Uint8Array(await currentBlob.arrayBuffer());
+        const cmd = new RecognizeCelebritiesCommand({ Image: { Bytes: bytes } });
+        
+        console.log('🚀 Sending to AWS Rekognition...');
+        const { CelebrityFaces = [] } = await client.send(cmd);
+        console.log('📥 AWS Response:', CelebrityFaces.length, 'celebrities found');
+
+        if (!CelebrityFaces.length) {
+          statusTxt.textContent = '😕 No celebrities detected in this image.';
+          statusTxt.className = 'error';
+          return;
+        }
+        
+        // Display results
+        resultHdr.classList.remove('hidden');
+        resultsUl.innerHTML = CelebrityFaces
+          .sort((a, b) => b.MatchConfidence - a.MatchConfidence) // Sort by confidence
+          .map(celebrity => {
+            const confidence = celebrity.MatchConfidence.toFixed(1);
+            const imdbUrl = celebrity.Urls?.find(url => url.includes('imdb.com')) || '#';
+            
+            return `
+              <li>
+                <div>
+                  <strong>${celebrity.Name}</strong>
+                  ${imdbUrl !== '#' ? `<br><a href="${imdbUrl}" target="_blank" style="color: #74b9ff; text-decoration: none;">View on IMDb →</a>` : ''}
+                </div>
+                <span class="confidence">${confidence}%</span>
+              </li>
+            `;
+          }).join('');
+          
+        statusTxt.textContent = `🎉 Found ${CelebrityFaces.length} celebrity${CelebrityFaces.length > 1 ? 'ies' : ''}!`;
+        statusTxt.className = 'success';
+        
+      } catch (err) {
+        console.error('AWS Rekognition error:', err);
+        showError('❌ Recognition failed: ' + (err.message || 'Please check connection and try again.'));
+      } finally {
+        analyseBtn.disabled = false;
+      }
+    });
+
+    function showError(msg) {
+      statusTxt.textContent = msg;
+      statusTxt.className = 'error';
+    }
+
+    // Initialize when page loads
+    checkAWSStatus();
+    
+    // Auto-start camera on page load with multiple attempts
+    window.addEventListener('load', () => {
+      console.log('🎬 Actor Identifier starting...');
+      initializeCamera();
+    });
+    
+    // Also try on DOMContentLoaded in case load event doesn't fire
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('📱 DOM ready, ensuring camera start...');
+      // Only start if not already started
+      if (!stream) {
+        setTimeout(initializeCamera, 1000);
+      }
+    });
+    
+    // Manual camera button with enhanced iOS handling
+    function addManualCameraButton(buttonText = '📷 START CAMERA') {
+      // Remove existing manual button if any
+      const existingBtn = document.querySelector('.manual-camera-btn');
+      if (existingBtn) existingBtn.remove();
+      
+      const manualBtn = document.createElement('button');
+      manualBtn.textContent = buttonText;
+      manualBtn.className = 'manual-camera-btn';
+      manualBtn.style.cssText = `
+        padding: 1.5rem 2rem;
+        border: none;
+        border-radius: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        color: #fff;
+        margin: 1rem auto;
+        display: block;
+        box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        font-size: 1.3rem;
+        width: 100%;
+        max-width: 350px;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      `;
+      
+      manualBtn.onclick = async (event) => {
+        debugLog('👆 MANUAL BUTTON CLICKED - User interaction detected');
+        event.preventDefault();
+        
+        manualBtn.disabled = true;
+        manualBtn.textContent = '📱 STARTING CAMERA...';
+        manualBtn.style.background = 'linear-gradient(45deg, #95a5a6, #7f8c8d)';
+        
+        statusTxt.textContent = '📱 Requesting camera access (this may take a moment)...';
+        statusTxt.className = '';
+        
+        try {
+          debugLog('🎬 Calling camera with user gesture');
+          
+          // Direct camera call with user gesture
+          const basicStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            }
+          });
+          
+          debugLog('✅ Camera stream obtained successfully');
+          
+          // Set up video
+          stream = basicStream;
+          video.srcObject = stream;
+          video.classList.remove('hidden');
+          previewImg.classList.add('hidden');
+          
+          debugLog('📺 Video element configured');
+          
+          // Show other controls
+          snapBtn.style.display = 'block';
+          snapBtn.disabled = false;
+          uploadBtn.style.display = 'block';
+          
+          // Remove the manual button
+          manualBtn.remove();
+          
+          statusTxt.textContent = '✅ Camera ready! Point at TV screen and tap "Snap Photo"';
+          statusTxt.className = 'success';
+          
+          debugLog('🎉 Camera setup complete');
+          
+        } catch (err) {
+          debugLog('❌ Camera failed: ' + err.name + ' - ' + err.message);
+          
+          manualBtn.disabled = false;
+          manualBtn.textContent = '❌ TRY AGAIN';
+          manualBtn.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+          
+          if (err.name === 'NotAllowedError') {
+            statusTxt.innerHTML = `
+              🚫 <strong>Camera Permission Denied</strong><br><br>
+              Please check:<br>
+              • Safari Settings → Camera → Allow<br>
+              • No other apps using camera<br>
+              • Try refreshing the page<br><br>
+              <small>Or use the upload option below ↓</small>
+            `;
+          } else if (err.name === 'NotFoundError') {
+            statusTxt.innerHTML = `
+              📷 <strong>No Camera Found</strong><br><br>
+              This might be:<br>
+              • Camera not available on device<br>
+              • Camera being used by another app<br>
+              • Hardware issue<br><br>
+              <small>Try the upload option below ↓</small>
+            `;
+          } else {
+            statusTxt.textContent = `❌ Camera Error: ${err.message}`;
+          }
+          
+          statusTxt.className = 'error';
+          
+          // Show upload as fallback
+          uploadBtn.style.display = 'block';
+          uploadBtn.textContent = '📂 Upload Photo Instead';
+        }
+      };
+      
+      const container = document.querySelector('.controls');
+      container.appendChild(manualBtn);
+    }
+
+    // Show device and browser info
+    function showDeviceInfo() {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isSecure = location.protocol === 'https:';
+      
+      debugLog('📱 Device: ' + (isIOS ? 'iOS' : 'Other'));
+      debugLog('🌐 Browser: ' + (isSafari ? 'Safari' : 'Other'));
+      debugLog('🔒 Secure: ' + (isSecure ? 'HTTPS' : 'HTTP'));
+      debugLog('📍 URL: ' + location.href);
+      
+      if (!isSecure && isIOS) {
+        statusTxt.innerHTML = `
+          ⚠️ <strong>HTTPS Required</strong><br>
+          iPhone Safari requires HTTPS for camera access.<br>
+          Please use https:// instead of http://
+        `;
+        statusTxt.className = 'error';
+        return false;
+      }
+      
+      return true;
+    }
+    
+    // Add manual button after 5 seconds if camera hasn't started
+    setTimeout(() => {
+      if (!stream) {
+        console.log('⏰ Camera not started after 5s, adding manual button');
+        addManualCameraButton();
+      }
+    }, 5000);
+    
+    console.log('🎬 Actor Identifier ready!');
   </script>
 </body>
 </html>
