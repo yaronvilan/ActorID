@@ -164,4 +164,28 @@
     function selectAnswer(c){c===correctShow?show('s5correct'):show('s6wrong');}
 
     /* Build reveal */
-    async function buildReveal(){revealName.textContent=actorName;showList.innerHTML='Loading…';try{const p=await fetch(`https://api.themoviedb.org/3/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(actorName)}`);const pj=await p.json();const pid=pj.results?.[0]?.id;if(!pid)throw 0;const tv=await fetch(`https://api.themoviedb.org/3/person/${pid}/tv_credits?api_key
+    async function buildReveal(){
+      revealName.textContent = actorName;
+      showList.innerHTML = 'Loading…';
+      try{
+        const search = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(actorName)}`);
+        const searchJson = await search.json();
+        const personId = searchJson.results?.[0]?.id;
+        if(!personId){ throw new Error('No TMDB match'); }
+        const tvRes = await fetch(`https://api.themoviedb.org/3/person/${personId}/tv_credits?api_key=${TMDB_KEY}`);
+        const tvJson = await tvRes.json();
+        const shows = tvJson.cast.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,4);
+        showList.innerHTML = '';
+        shows.forEach(s=>{
+          const li = document.createElement('li');
+          li.textContent = '• ' + s.name;
+          showList.appendChild(li);
+        });
+      }catch(err){
+        console.error(err);
+        showList.textContent = 'Could not load shows';
+      }
+    }
+  </script>
+</body>
+</html>
