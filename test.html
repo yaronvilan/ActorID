@@ -2,577 +2,125 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>🎬 Who's that Actor?</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Actor Identifier</title>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 10px;
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      overflow: hidden;
-      padding-bottom: env(safe-area-inset-bottom, 20px);
+    :root {
+      --bg-1: #0f172a;  /* deep slate */
+      --bg-2: #1e293b;
+      --fg: #f8fafc;    /* near‑white text */
+      --accent: #3b82f6;/* blue buttons */
+      --danger: #ef4444;
+      --success: #10b981;
     }
-    
-    .container {
-      max-width: 500px;
-      width: 100%;
-      height: 100%;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-radius: 20px;
-      padding: 15px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      padding-bottom: env(safe-area-inset-bottom, 15px);
-    }
-    
-    h1 {
-      font-size: 1.4rem;
-      margin: 0 0 3px 0;
-    }
-    
-    .subtitle {
-      font-size: 0.8rem;
-      opacity: 0.8;
-      margin-bottom: 8px;
-    }
-    
-    .camera-container {
-      width: 100%;
-      aspect-ratio: 1;
-      max-width: 350px;
-      margin: 0 auto;
-      background: rgba(0, 0, 0, 0.5);
-      border-radius: 15px;
-      margin-bottom: 8px;
-      overflow: hidden;
-      position: relative;
-    }
-    
-    video, img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 15px;
-    }
-    
-    .hidden {
-      display: none;
-    }
-    
-    .controls {
-      display: flex;
-      gap: 6px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 8px;
-    }
-    
-    button {
-      padding: 10px 16px;
-      border: none;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      background: #3498db;
-      color: white;
-      box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-      transition: all 0.3s ease;
-      flex: 1;
-      min-width: 90px;
-      max-width: 140px;
-    }
-    
-    button:hover {
-      transform: translateY(-2px);
-    }
-    
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-    
-    .big-button {
-      background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-      font-size: 14px;
-      padding: 12px 20px;
-    }
-    
-    #status {
-      padding: 6px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.1);
-      margin-bottom: 8px;
-      font-size: 0.8rem;
-      min-height: 12px;
-    }
-    
-    .error {
-      background: rgba(231, 76, 60, 0.3);
-      color: #fff;
-    }
-    
-    .success {
-      background: rgba(39, 174, 96, 0.3);
-      color: #fff;
-    }
-    
-    input[type="file"] {
-      display: none;
-    }
-    
-    #results {
-      font-size: 0.75rem;
-      max-height: 60px;
-      overflow-y: auto;
-      flex-shrink: 0;
-    }
-    
-    #results ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    
-    #results li {
-      background: rgba(255, 255, 255, 0.1);
-      margin: 2px 0;
-      padding: 6px;
-      border-radius: 6px;
-      border-left: 2px solid #27ae60;
-      font-size: 0.75rem;
-    }
-    
-    #results a {
-      color: #74b9ff !important;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 0.7rem;
-    }
-    
-    .actor-name {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin: 8px 0;
-      color: #fff;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      display: block;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    .actor-name:hover {
-      color: #74b9ff;
-      text-shadow: 0 2px 8px rgba(116, 185, 255, 0.3);
-      transform: scale(1.02);
-    }
-    
-    .confidence-badge {
-      background: rgba(39, 174, 96, 0.3);
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 0.7rem;
-      font-weight: bold;
-      display: inline-block;
-      margin-top: 5px;
-    }
-    
-    /* iPhone specific optimizations */
-    @media (max-height: 750px) {
-      .container {
-        padding: 10px;
-        padding-bottom: max(env(safe-area-inset-bottom), 10px);
-      }
-      
-      h1 {
-        font-size: 1.2rem;
-        margin-bottom: 2px;
-      }
-      
-      .subtitle {
-        font-size: 0.75rem;
-        margin-bottom: 5px;
-      }
-      
-      .camera-container {
-        max-width: 300px;
-        margin-bottom: 5px;
-      }
-      
-      button {
-        padding: 8px 12px;
-        font-size: 12px;
-        min-width: 80px;
-      }
-      
-      .big-button {
-        padding: 10px 16px;
-        font-size: 13px;
-      }
-      
-      #status {
-        padding: 4px;
-        font-size: 0.75rem;
-        margin-bottom: 5px;
-      }
-      
-      #results {
-        max-height: 40px;
-        font-size: 0.7rem;
-      }
-    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden;background:var(--bg-1);color:var(--fg);font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;}
+
+    /*— shared layout —*/
+    .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:2vh;background:var(--bg-1);}  
+    .hidden{display:none!important}
+    h1,h2{font-size:8vw;text-align:center;line-height:1.1;font-weight:700}
+    p{font-size:4.5vw;text-align:center;line-height:1.2}
+    button{border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:5vw;font-weight:600;padding:.6em 1.4em;cursor:pointer;}
+    button.secondary{background:#475569}
+
+    /*— square viewfinder / preview —*/
+    video,img{width:80vmin;height:80vmin;max-width:90vw;max-height:90vw;border-radius:12px;object-fit:cover;border:3px dashed var(--accent);}  
+    #preview{border:3px solid var(--accent)}
+
+    /*— result indicator —*/
+    .badge{width:25vmin;height:25vmin;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12vw;font-weight:700;color:#fff}
+    .success{background:var(--success)}
+    .error{background:var(--danger)}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🎬 Who's that Actor?</h1>
-    <p class="subtitle">Snap any actor on your TV screen!</p>
-    
-    <div id="status">Ready to start</div>
-    
-    <div id="actorName" class="hidden"></div>
-    
-    <div class="camera-container">
-      <video id="video" class="hidden" autoplay muted playsinline></video>
-      <img id="preview" class="hidden" alt="Captured photo" />
-      <div id="placeholder" style="display: flex; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.5); font-size: 4rem;">
-        📷
-      </div>
-    </div>
+  <!-- SCREEN 1 – live camera & instruction -->
+  <section id="s1" class="screen">
+    <h1>Point at the TV</h1>
+    <p>Zoom in on the actor’s face<br>Tap anywhere to snap</p>
+    <video id="video" playsinline muted autoplay></video>
+  </section>
 
-    <div class="controls">
-      <button id="startBtn" class="big-button">📷 START</button>
-      <button id="snapBtn" class="hidden" disabled>📸 SNAP</button>
-      <button id="analyzeBtn" class="hidden" disabled>🎬 IDENTIFY ACTOR</button>
-      <button id="retakeBtn" class="hidden">🔄 RETAKE</button>
-      <input type="file" id="fileInput" accept="image/*" style="display: none;">
+  <!-- SCREEN 2 – review photo -->
+  <section id="s2" class="screen hidden">
+    <h1>Identify an actor</h1>
+    <img id="preview" alt="Snapshot" />
+    <div style="display:flex;gap:4vw;">
+      <button id="retakeBtn" class="secondary">Retake</button>
+      <button id="identifyBtn">Identify</button>
     </div>
+  </section>
 
-    <div id="results"></div>
-  </div>
+  <!-- SCREEN 3 – result -->
+  <section id="s3" class="screen hidden">
+    <div id="indicator"></div>
+    <h2 id="resultText">—</h2>
+    <button id="newBtn">New photo</button>
+  </section>
+
+  <!-- hidden file input (uses the original mechanism) -->
+  <input type="file" accept="image/*" capture="environment" id="captureInput" class="hidden">
 
   <script>
-    // Simple global variables
-    let video = document.getElementById('video');
-    let preview = document.getElementById('preview');
-    let placeholder = document.getElementById('placeholder');
-    let status = document.getElementById('status');
-    let actorName = document.getElementById('actorName');
-    let startBtn = document.getElementById('startBtn');
-    let snapBtn = document.getElementById('snapBtn');
-    let analyzeBtn = document.getElementById('analyzeBtn');
-    let retakeBtn = document.getElementById('retakeBtn');
-    let fileInput = document.getElementById('fileInput');
-    let results = document.getElementById('results');
-    
-    let currentStream = null;
-    let currentBlob = null;
-    
-    // Check device
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
-    
-    // Check requirements
-    if (isIOS && !isSecure) {
-      status.innerHTML = '⚠️ HTTPS required for camera on iPhone';
-      status.className = 'error';
-      startBtn.disabled = true;
+    /* keep original mechanism (file input) but trigger automatically */
+    const captureInput = document.getElementById('captureInput');
+    const video        = document.getElementById('video');
+    const previewImg   = document.getElementById('preview');
+    const indicatorBox = document.getElementById('indicator');
+    const resultText   = document.getElementById('resultText');
+
+    let snapshotBlob;
+    let stream;
+
+    const show = id => ['s1','s2','s3'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+
+    /* open file‑input immediately when user taps video (can’t auto‑open) */
+    document.getElementById('s1').addEventListener('click',()=>captureInput.click());
+
+    /* handle chosen photo */
+    captureInput.addEventListener('change', ev=>{
+      if(!ev.target.files[0]) return;
+      snapshotBlob = ev.target.files[0];
+      previewImg.src = URL.createObjectURL(snapshotBlob);
+      show('s2');
+    });
+
+    /* retake = back to camera */
+    document.getElementById('retakeBtn').onclick=()=>{
+      captureInput.value='';
+      show('s1');
+    };
+
+    /* identify = fake call (replace with AWS) */
+    document.getElementById('identifyBtn').onclick=()=>{
+      show('s3');
+      resultText.textContent = 'Identifying…';
+      indicatorBox.className='badge';
+      setTimeout(()=>{
+        // mock result 50/50
+        const ok = Math.random()>.5;
+        if(ok){ indicatorBox.className='badge success'; indicatorBox.textContent='✓'; resultText.textContent='Leonardo DiCaprio'; }
+        else  { indicatorBox.className='badge error';   indicatorBox.textContent='✗'; resultText.textContent='Unidentified'; }
+      },1200);
+    };
+
+    /* start over */
+    document.getElementById('newBtn').onclick=()=>{
+      captureInput.value='';
+      indicatorBox.textContent='';
+      show('s1');
+    };
+
+    /* open rear camera as background (optional preview; not captured) */
+    async function openCamera(){
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+        video.srcObject = stream;
+        await video.play();
+      }catch(err){console.error(err);}
     }
-    
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      status.innerHTML = '❌ Camera not supported in this browser';
-      status.className = 'error';
-      startBtn.disabled = true;
-    }
-    
-    // Start camera button - Fixed to prioritize back camera
-    startBtn.onclick = async function() {
-      startBtn.disabled = true;
-      startBtn.textContent = '📱 Starting camera...';
-      status.textContent = 'Requesting camera access...';
-      status.className = '';
-      
-      try {
-        // First try with exact back camera requirement
-        let stream = null;
-        
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { exact: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-        } catch (exactError) {
-          // If exact fails, fall back to ideal (more compatible)
-          console.log('Exact back camera failed, trying ideal:', exactError.message);
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-        }
-        
-        currentStream = stream;
-        
-        // Set up video
-        video.srcObject = currentStream;
-        video.classList.remove('hidden');
-        placeholder.style.display = 'none';
-        
-        // Wait for video to load
-        video.onloadedmetadata = function() {
-          // Show snap button
-          startBtn.classList.add('hidden');
-          snapBtn.classList.remove('hidden');
-          snapBtn.disabled = false;
-          
-          status.textContent = '✅ Camera ready! Point at TV and snap photo';
-          status.className = 'success';
-        };
-        
-        // Fallback - enable after 3 seconds
-        setTimeout(function() {
-          if (snapBtn.disabled && currentStream) {
-            snapBtn.disabled = false;
-            status.textContent = '📸 Camera ready - you can snap photos';
-            status.className = 'success';
-          }
-        }, 3000);
-        
-      } catch (err) {
-        startBtn.disabled = false;
-        startBtn.textContent = '❌ TRY AGAIN';
-        
-        if (err.name === 'NotAllowedError') {
-          status.innerHTML = '🚫 Camera permission denied<br><small>Check Safari settings or try refreshing</small>';
-        } else if (err.name === 'NotFoundError') {
-          status.innerHTML = '📷 No camera found<br><small>Make sure camera is available</small>';
-        } else {
-          status.innerHTML = '❌ Camera error: ' + err.message;
-        }
-        status.className = 'error';
-      }
-    };
-    
-    // Snap photo
-    snapBtn.onclick = function() {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        
-        // Convert to blob
-        canvas.toBlob(function(blob) {
-          if (blob) {
-            currentBlob = blob;
-            
-            // Show preview
-            preview.src = URL.createObjectURL(blob);
-            preview.classList.remove('hidden');
-            video.classList.add('hidden');
-            
-            // Update UI
-            snapBtn.classList.add('hidden');
-            analyzeBtn.classList.remove('hidden');
-            analyzeBtn.disabled = false;
-            retakeBtn.classList.remove('hidden');
-            
-            status.textContent = '📸 Photo captured! Ready to analyze';
-            status.className = 'success';
-          } else {
-            status.textContent = '❌ Failed to capture photo';
-            status.className = 'error';
-          }
-        }, 'image/jpeg', 0.8);
-        
-      } catch (err) {
-        status.textContent = '❌ Failed to capture: ' + err.message;
-        status.className = 'error';
-      }
-    };
-    
-    // File upload (hidden but functional)
-    fileInput.onchange = function() {
-      if (this.files[0]) {
-        currentBlob = this.files[0];
-        
-        // Show preview
-        preview.src = URL.createObjectURL(currentBlob);
-        preview.classList.remove('hidden');
-        video.classList.add('hidden');
-        placeholder.style.display = 'none';
-        
-        // Stop camera if running
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-          currentStream = null;
-        }
-        
-        // Update UI
-        startBtn.classList.add('hidden');
-        snapBtn.classList.add('hidden');
-        analyzeBtn.classList.remove('hidden');
-        analyzeBtn.disabled = false;
-        retakeBtn.classList.remove('hidden');
-        retakeBtn.textContent = '🔄 RETAKE';
-        
-        status.textContent = '📁 Photo uploaded! Ready to analyze';
-        status.className = 'success';
-      }
-    };
-    
-    // Analyze with AWS - Using demo data
-    analyzeBtn.onclick = async function() {
-      if (!currentBlob) return;
-      
-      analyzeBtn.disabled = true;
-      analyzeBtn.textContent = '🎬 IDENTIFYING...';
-      status.textContent = '🔍 Analyzing image...';
-      status.className = '';
-      
-      try {
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Mock celebrity data for demonstration
-        const mockResponse = {
-          CelebrityFaces: [
-            {
-              Name: "Leonardo DiCaprio",
-              MatchConfidence: 98.7,
-              Urls: ["https://www.imdb.com/name/nm0000138/"]
-            },
-            {
-              Name: "Jennifer Lawrence", 
-              MatchConfidence: 95.3,
-              Urls: ["https://www.imdb.com/name/nm2225369/"]
-            }
-          ]
-        };
-        
-        // Randomly select 1-2 celebrities for demo
-        const numCelebs = Math.floor(Math.random() * 2) + 1;
-        const selectedCelebs = mockResponse.CelebrityFaces.slice(0, numCelebs);
-        
-        const data = { CelebrityFaces: selectedCelebs };
-        
-        if (data.CelebrityFaces && data.CelebrityFaces.length > 0) {
-          // Show the first celebrity's name above the photo
-          const topCelebrity = data.CelebrityFaces[0];
-          const confidence = topCelebrity.MatchConfidence.toFixed(1);
-          
-          // Get IMDb URL
-          let imdbUrl = '#';
-          if (topCelebrity.Urls && topCelebrity.Urls.length > 0) {
-            const foundImdbUrl = topCelebrity.Urls.find(url => url.includes('imdb.com'));
-            if (foundImdbUrl) {
-              imdbUrl = foundImdbUrl;
-            }
-          }
-          
-          // Show actor name above photo as clickable link
-          actorName.innerHTML = `
-            <a href="${imdbUrl}" target="_blank" class="actor-name">
-              ${topCelebrity.Name}
-            </a>
-            <div class="confidence-badge">${confidence}% confidence</div>
-          `;
-          actorName.classList.remove('hidden');
-          
-          // If multiple celebrities, show the rest in results
-          if (data.CelebrityFaces.length > 1) {
-            let additionalResults = '<div style="font-size: 0.7rem; margin-top: 10px; opacity: 0.8;">Also detected:</div><ul>';
-            
-            data.CelebrityFaces.slice(1).forEach(celebrity => {
-              const conf = celebrity.MatchConfidence.toFixed(1);
-              let otherImdbUrl = '#';
-              
-              if (celebrity.Urls && celebrity.Urls.length > 0) {
-                const foundUrl = celebrity.Urls.find(url => url.includes('imdb.com'));
-                if (foundUrl) {
-                  otherImdbUrl = foundUrl;
-                }
-              }
-              
-              additionalResults += `
-                <li style="display: flex; justify-content: space-between; align-items: center;">
-                  <a href="${otherImdbUrl}" target="_blank" style="color: #74b9ff; text-decoration: none; font-size: 0.7rem;">
-                    ${celebrity.Name}
-                  </a>
-                  <span style="font-size: 0.6rem; opacity: 0.7;">${conf}%</span>
-                </li>
-              `;
-            });
-            
-            additionalResults += '</ul>';
-            results.innerHTML = additionalResults;
-          } else {
-            results.innerHTML = '';
-          }
-          
-          status.textContent = '🎉 Actor identified!';
-          status.className = 'success';
-        } else {
-          status.textContent = '😕 No celebrities found in this image';
-          status.className = 'error';
-        }
-        
-      } catch (err) {
-        status.textContent = '❌ Analysis failed: ' + err.message;
-        status.className = 'error';
-      } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.textContent = '🎬 IDENTIFY ACTOR';
-      }
-    };
-    
-    // Retake/restart
-    retakeBtn.onclick = function() {
-      // Reset UI
-      preview.classList.add('hidden');
-      actorName.classList.add('hidden');
-      analyzeBtn.classList.add('hidden');
-      retakeBtn.classList.add('hidden');
-      results.innerHTML = '';
-      
-      if (currentStream) {
-        // Camera is still running - go back to snap
-        video.classList.remove('hidden');
-        snapBtn.classList.remove('hidden');
-        snapBtn.disabled = false;
-        status.textContent = '📸 Point at TV and snap photo';
-        status.className = 'success';
-      } else {
-        // No camera - show start button
-        placeholder.style.display = 'flex';
-        startBtn.classList.remove('hidden');
-        startBtn.disabled = false;
-        startBtn.textContent = '📷 START CAMERA';
-        retakeBtn.textContent = '🔄 RETAKE';
-        status.textContent = 'Ready to start';
-        status.className = '';
-      }
-    };
+    openCamera();
   </script>
 </body>
 </html>
