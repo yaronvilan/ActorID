@@ -9,14 +9,16 @@
       --bg:#0f172a;--fg:#f8fafc;--accent:#3b82f6;--danger:#ef4444;--success:#10b981;
     }
     *,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;touch-action:none}
+    html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+              font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;touch-action:none}
 
     .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:2vh;background:var(--bg)}
     .hidden{display:none!important}
     h1,h2{font-size:8vw;font-weight:700;text-align:center;line-height:1.1}
     p{font-size:4.5vw;text-align:center}
-    button{border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:5vw;font-weight:600;padding:.6em 1.4em;cursor:pointer}
+    button{border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:5vw;font-weight:600;padding:.6em 1.4em;cursor:pointer;min-width:40vw}
     button.secondary{background:#475569}
+    button.alt{background:#334155}
 
     video,img{width:80vmin;height:80vmin;max-width:90vw;max-height:90vw;border-radius:12px;object-fit:cover;border:3px dashed var(--accent)}
     #preview{border:3px solid var(--accent)}
@@ -24,6 +26,8 @@
     .badge{width:25vmin;height:25vmin;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12vw;font-weight:700;color:#fff;margin-bottom:2vh}
     .success{background:var(--success)}
     .error{background:var(--danger)}
+
+    .answers{display:flex;flex-direction:column;gap:2vh;width:100%;align-items:center}
   </style>
   <script type="module" src="https://cdn.jsdelivr.net/npm/@aws-sdk/client-rekognition/+esm"></script>
 </head>
@@ -45,11 +49,26 @@
     </div>
   </section>
 
-  <!-- Screen 3 -->
+  <!-- Screen 3 – identifying badge/result -->
   <section id="s3" class="screen hidden">
     <div id="indicator"></div>
     <h2 id="resultText">—</h2>
-    <button id="newBtn">New photo</button>
+  </section>
+
+  <!-- Screen 4 – Quiz or Reveal -->
+  <section id="s4" class="screen hidden">
+    <h1>Quiz or Reveal?</h1>
+    <div style="display:flex;gap:4vw">
+      <button id="quizBtn">Quiz</button>
+      <button id="revealBtn" class="secondary">Reveal</button>
+    </div>
+  </section>
+
+  <!-- Screen 5 – Quiz itself -->
+  <section id="s5" class="screen hidden">
+    <h2 id="quizQuestion">This actor appeared as…</h2>
+    <div id="answers" class="answers"></div>
+    <button id="quizBackBtn" class="alt">Back</button>
   </section>
 
   <canvas id="snapCanvas" class="hidden"></canvas>
@@ -66,44 +85,40 @@
       }
     });
 
-    /* Elements */
-    const video=document.getElementById('video');
-    const preview=document.getElementById('preview');
-    const canvas=document.getElementById('snapCanvas');
-    const indicator=document.getElementById('indicator');
-    const resultText=document.getElementById('resultText');
-    const show=id=>['s1','s2','s3'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+    /* TMDB credentials (replace) */
+    const TMDB_KEY = 'YOUR_TMDB_API_KEY';
 
-    let snapshotBlob;
+    /* Elements */
+    const video = document.getElementById('video');
+    const preview = document.getElementById('preview');
+    const canvas = document.getElementById('snapCanvas');
+    const indicator = document.getElementById('indicator');
+    const resultText = document.getElementById('resultText');
+    const quizQuestion = document.getElementById('quizQuestion');
+    const answersBox = document.getElementById('answers');
+
+    const show = id => ['s1','s2','s3','s4','s5'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+
+    let snapshotBlob, actorName, actorId, correctAnswer;
 
     /* open camera */
     (async()=>{
       try{
         const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-        video.srcObject=stream;
-        await video.play();
+        video.srcObject=stream; await video.play();
       }catch(e){console.error('camera',e)}
     })();
 
-    /* pinch‑zoom on video */
-    let baseScale=1;let pinchStartDist=0;
-    video.addEventListener('pointerdown',ev=>video.setPointerCapture(ev.pointerId));
-    video.addEventListener('pointermove',ev=>{
-      const pts=Array.from(video.getPointerCapture?video._pointerList||[]:[]);
-    });
-    const active=[];
-    video.addEventListener('pointerdown',e=>{active.push(e);if(active.length===2){pinchStartDist=dist(active)}});
-    video.addEventListener('pointerup',e=>{active.splice(active.findIndex(p=>p.pointerId===e.pointerId),1);if(active.length<2)baseScale=currentScale});
-    video.addEventListener('pointermove',e=>{
-      const idx=active.findIndex(p=>p.pointerId===e.pointerId);if(idx>-1){active[idx]=e;}
-      if(active.length===2){const d=dist(active);currentScale=Math.min(3,Math.max(1,baseScale*d/pinchStartDist));video.style.transform=`scale(${currentScale})`;}}
-    );
-    let currentScale=1;
-    function dist([a,b]){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+    /* pinch‑zoom */
+    let baseScale=1,pinchStart=0,currentScale=1;const active=[];
+    const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    video.addEventListener('pointerdown',e=>{active.push(e);video.setPointerCapture(e.pointerId);if(active.length===2)pinchStart=dist(...active)});
+    video.addEventListener('pointermove',e=>{const i=active.findIndex(p=>p.pointerId===e.pointerId);if(i>-1)active[i]=e;if(active.length===2){const d=dist(...active);currentScale=Math.min(3,Math.max(1,baseScale*d/pinchStart));video.style.transform=`scale(${currentScale})`}});
+    video.addEventListener('pointerup',e=>{const i=active.findIndex(p=>p.pointerId===e.pointerId);if(i>-1)active.splice(i,1);if(active.length<2)baseScale=currentScale});
 
     /* tap to snap */
     document.getElementById('s1').addEventListener('click',async()=>{
-      const w=video.videoWidth||640;const h=video.videoHeight||480;
+      const w=video.videoWidth||640,h=video.videoHeight||480;
       canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(video,0,0,w,h);
       snapshotBlob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/jpeg',0.85));
@@ -120,11 +135,55 @@
         const bytes=new Uint8Array(await snapshotBlob.arrayBuffer());
         const {CelebrityFaces=[]}=await rekognition.send(new RecognizeCelebritiesCommand({Image:{Bytes:bytes}}));
         if(!CelebrityFaces.length){indicator.className='badge error';indicator.textContent='✗';resultText.textContent='Unidentified';return;}
-        indicator.className='badge success';indicator.textContent='✓';resultText.textContent=CelebrityFaces[0].Name;
+        actorName = CelebrityFaces[0].Name;
+        indicator.className='badge success';indicator.textContent='✓';resultText.textContent=actorName;
+        setTimeout(()=>show('s4'),1000);
       }catch(err){console.error(err);indicator.className='badge error';indicator.textContent='!';resultText.textContent='Error';}
     };
 
-    document.getElementById('newBtn').onclick=()=>{indicator.textContent='';video.style.transform='scale(1)';currentScale=baseScale=1;show('s1')};
+    /* Quiz or reveal */
+    document.getElementById('revealBtn').onclick=()=>{alert(actorName);show('s1')};
+
+    document.getElementById('quizBtn').onclick=async()=>{
+      await buildQuiz();
+      show('s5');
+    };
+
+    document.getElementById('quizBackBtn').onclick=()=>{show('s4')};
+
+    async function buildQuiz(){
+      quizQuestion.textContent=`${actorName} appeared in:`;
+      answersBox.innerHTML='Loading…';
+      try{
+        // 1. search actor on TMDB
+        const pRes=await fetch(`https://api.themoviedb.org/3/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(actorName)}`);
+        const pJson=await pRes.json();
+        actorId=pJson.results?.[0]?.id;
+        if(!actorId)throw new Error('TMDB actor not found');
+        // 2. get TV credits
+        const tvRes=await fetch(`https://api.themoviedb.org/3/person/${actorId}/tv_credits?api_key=${TMDB_KEY}`);
+        const tvJson=await tvRes.json();
+        const shows=tvJson.cast.sort((a,b)=>(b.popularity||0)-(a.popularity||0)).slice(0,4);
+        if(shows.length<2)throw new Error('Not enough shows');
+        const trueShows=shows.slice(0,2);
+        // 3. gather two random wrong shows
+        const wrongPool=['Friends','Breaking Bad','Stranger Things','The Office','Game of Thrones','Lost'];
+        const wrongShows=[];while(wrongShows.length<2){const w=wrongPool[Math.floor(Math.random()*wrongPool.length)];if(!trueShows.some(t=>t.name===w)&&!wrongShows.includes(w))wrongShows.push(w)}
+        const options=[...trueShows.map(s=>s.name),...wrongShows];
+        options.sort(()=>Math.random()-.5);
+        correctAnswer=trueShows[0].name;
+        answersBox.innerHTML='';
+        options.forEach(opt=>{
+          const btn=document.createElement('button');btn.textContent=opt;btn.onclick=()=>checkAnswer(opt);
+          answersBox.appendChild(btn);
+        });
+      }catch(err){answersBox.textContent='Quiz error';console.error(err)}
+    }
+
+    function checkAnswer(choice){
+      if(choice===correctAnswer){alert('Correct!');show('s1');}
+      else {alert('Try Again');buildQuiz();}
+    }
   </script>
 </body>
-</html>
+</
