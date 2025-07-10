@@ -111,7 +111,7 @@
     const quizQ=$('quizQuestion'),answersBox=$('answers');
     const revealName=$('revealName'),showList=$('showList');
     const screens=['s1','s2','s3fail','s3succ','s4quiz','s5correct','s6wrong','s7reveal'];
-    const show=id=>screens.forEach(s=>$((s))).classList.toggle('hidden',s!==id);
+    const show = id => screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
 
     let stream,snapshotBlob,actorName,correctShow;
 
