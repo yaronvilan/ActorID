@@ -117,16 +117,12 @@
 
     async function openCamera(){
       try{
-        if(stream){video.srcObject=stream;await video.play();return;}
-        // Prefer rear camera, fallback to any if not available
-        try{
-          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:'environment'}}});
-        }catch(e){
-          stream=await navigator.mediaDevices.getUserMedia({video:true});
-        }
-        video.srcObject=stream;
+        if(stream){video.srcObject = stream; await video.play(); return;}
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
         await video.play();
-      }catch(e){console.error('cam',e);} }
+      }catch(err){ console.error('Camera error', err); }
+    }
     openCamera();
 
     // Stop stream when page hidden to avoid permission issues
