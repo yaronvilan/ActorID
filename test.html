@@ -5,122 +5,126 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Actor Identifier</title>
   <style>
-    :root {
-      --bg-1: #0f172a;  /* deep slate */
-      --bg-2: #1e293b;
-      --fg: #f8fafc;    /* near‑white text */
-      --accent: #3b82f6;/* blue buttons */
-      --danger: #ef4444;
-      --success: #10b981;
+    :root{
+      --bg:#0f172a;--fg:#f8fafc;--accent:#3b82f6;--danger:#ef4444;--success:#10b981;
     }
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;overflow:hidden;background:var(--bg-1);color:var(--fg);font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;}
+    *,*:before,*:after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;touch-action:none}
 
-    /*— shared layout —*/
-    .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:2vh;background:var(--bg-1);}  
+    .screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2vh;padding:2vh;background:var(--bg)}
     .hidden{display:none!important}
-    h1,h2{font-size:8vw;text-align:center;line-height:1.1;font-weight:700}
-    p{font-size:4.5vw;text-align:center;line-height:1.2}
-    button{border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:5vw;font-weight:600;padding:.6em 1.4em;cursor:pointer;}
+    h1,h2{font-size:8vw;font-weight:700;text-align:center;line-height:1.1}
+    p{font-size:4.5vw;text-align:center}
+    button{border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:5vw;font-weight:600;padding:.6em 1.4em;cursor:pointer}
     button.secondary{background:#475569}
 
-    /*— square viewfinder / preview —*/
-    video,img{width:80vmin;height:80vmin;max-width:90vw;max-height:90vw;border-radius:12px;object-fit:cover;border:3px dashed var(--accent);}  
+    video,img{width:80vmin;height:80vmin;max-width:90vw;max-height:90vw;border-radius:12px;object-fit:cover;border:3px dashed var(--accent)}
     #preview{border:3px solid var(--accent)}
 
-    /*— result indicator —*/
-    .badge{width:25vmin;height:25vmin;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12vw;font-weight:700;color:#fff}
+    .badge{width:25vmin;height:25vmin;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12vw;font-weight:700;color:#fff;margin-bottom:2vh}
     .success{background:var(--success)}
     .error{background:var(--danger)}
   </style>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@aws-sdk/client-rekognition/+esm"></script>
 </head>
 <body>
-  <!-- SCREEN 1 – live camera & instruction -->
+  <!-- Screen 1 -->
   <section id="s1" class="screen">
-    <h1>Point at the TV</h1>
-    <p>Zoom in on the actor’s face<br>Tap anywhere to snap</p>
+    <h1>Point at the TV</h1>
+    <p>Pinch to zoom<br>Tap anywhere to snap</p>
     <video id="video" playsinline muted autoplay></video>
   </section>
 
-  <!-- SCREEN 2 – review photo -->
+  <!-- Screen 2 -->
   <section id="s2" class="screen hidden">
     <h1>Identify an actor</h1>
-    <img id="preview" alt="Snapshot" />
-    <div style="display:flex;gap:4vw;">
+    <img id="preview" alt="snapshot"/>
+    <div style="display:flex;gap:4vw">
       <button id="retakeBtn" class="secondary">Retake</button>
       <button id="identifyBtn">Identify</button>
     </div>
   </section>
 
-  <!-- SCREEN 3 – result -->
+  <!-- Screen 3 -->
   <section id="s3" class="screen hidden">
     <div id="indicator"></div>
     <h2 id="resultText">—</h2>
     <button id="newBtn">New photo</button>
   </section>
 
-  <!-- hidden file input (uses the original mechanism) -->
-  <input type="file" accept="image/*" capture="environment" id="captureInput" class="hidden">
+  <canvas id="snapCanvas" class="hidden"></canvas>
 
-  <script>
-    /* keep original mechanism (file input) but trigger automatically */
-    const captureInput = document.getElementById('captureInput');
-    const video        = document.getElementById('video');
-    const previewImg   = document.getElementById('preview');
-    const indicatorBox = document.getElementById('indicator');
-    const resultText   = document.getElementById('resultText');
+  <script type="module">
+    import { RekognitionClient, RecognizeCelebritiesCommand } from "https://cdn.jsdelivr.net/npm/@aws-sdk/client-rekognition/+esm";
+
+    /* AWS credentials (hard‑wired) */
+    const rekognition = new RekognitionClient({
+      region:"us-east-1",
+      credentials:{
+        accessKeyId:"AKIAUKQE2T34QL66ITWW",
+        secretAccessKey:"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"
+      }
+    });
+
+    /* Elements */
+    const video=document.getElementById('video');
+    const preview=document.getElementById('preview');
+    const canvas=document.getElementById('snapCanvas');
+    const indicator=document.getElementById('indicator');
+    const resultText=document.getElementById('resultText');
+    const show=id=>['s1','s2','s3'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
 
     let snapshotBlob;
-    let stream;
 
-    const show = id => ['s1','s2','s3'].forEach(s=>document.getElementById(s).classList.toggle('hidden',s!==id));
+    /* open camera */
+    (async()=>{
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+        video.srcObject=stream;
+        await video.play();
+      }catch(e){console.error('camera',e)}
+    })();
 
-    /* open file‑input immediately when user taps video (can’t auto‑open) */
-    document.getElementById('s1').addEventListener('click',()=>captureInput.click());
+    /* pinch‑zoom on video */
+    let baseScale=1;let pinchStartDist=0;
+    video.addEventListener('pointerdown',ev=>video.setPointerCapture(ev.pointerId));
+    video.addEventListener('pointermove',ev=>{
+      const pts=Array.from(video.getPointerCapture?video._pointerList||[]:[]);
+    });
+    const active=[];
+    video.addEventListener('pointerdown',e=>{active.push(e);if(active.length===2){pinchStartDist=dist(active)}});
+    video.addEventListener('pointerup',e=>{active.splice(active.findIndex(p=>p.pointerId===e.pointerId),1);if(active.length<2)baseScale=currentScale});
+    video.addEventListener('pointermove',e=>{
+      const idx=active.findIndex(p=>p.pointerId===e.pointerId);if(idx>-1){active[idx]=e;}
+      if(active.length===2){const d=dist(active);currentScale=Math.min(3,Math.max(1,baseScale*d/pinchStartDist));video.style.transform=`scale(${currentScale})`;}}
+    );
+    let currentScale=1;
+    function dist([a,b]){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
 
-    /* handle chosen photo */
-    captureInput.addEventListener('change', ev=>{
-      if(!ev.target.files[0]) return;
-      snapshotBlob = ev.target.files[0];
-      previewImg.src = URL.createObjectURL(snapshotBlob);
+    /* tap to snap */
+    document.getElementById('s1').addEventListener('click',async()=>{
+      const w=video.videoWidth||640;const h=video.videoHeight||480;
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(video,0,0,w,h);
+      snapshotBlob=await new Promise(res=>canvas.toBlob(b=>res(b),'image/jpeg',0.85));
+      preview.src=URL.createObjectURL(snapshotBlob);
       show('s2');
     });
 
-    /* retake = back to camera */
-    document.getElementById('retakeBtn').onclick=()=>{
-      captureInput.value='';
-      show('s1');
-    };
+    document.getElementById('retakeBtn').onclick=()=>{show('s1')};
 
-    /* identify = fake call (replace with AWS) */
-    document.getElementById('identifyBtn').onclick=()=>{
-      show('s3');
-      resultText.textContent = 'Identifying…';
-      indicatorBox.className='badge';
-      setTimeout(()=>{
-        // mock result 50/50
-        const ok = Math.random()>.5;
-        if(ok){ indicatorBox.className='badge success'; indicatorBox.textContent='✓'; resultText.textContent='Leonardo DiCaprio'; }
-        else  { indicatorBox.className='badge error';   indicatorBox.textContent='✗'; resultText.textContent='Unidentified'; }
-      },1200);
-    };
-
-    /* start over */
-    document.getElementById('newBtn').onclick=()=>{
-      captureInput.value='';
-      indicatorBox.textContent='';
-      show('s1');
-    };
-
-    /* open rear camera as background (optional preview; not captured) */
-    async function openCamera(){
+    /* identify */
+    document.getElementById('identifyBtn').onclick=async()=>{
+      show('s3');indicator.className='badge';indicator.textContent='';resultText.textContent='Identifying…';
       try{
-        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
-        video.srcObject = stream;
-        await video.play();
-      }catch(err){console.error(err);}
-    }
-    openCamera();
+        const bytes=new Uint8Array(await snapshotBlob.arrayBuffer());
+        const {CelebrityFaces=[]}=await rekognition.send(new RecognizeCelebritiesCommand({Image:{Bytes:bytes}}));
+        if(!CelebrityFaces.length){indicator.className='badge error';indicator.textContent='✗';resultText.textContent='Unidentified';return;}
+        indicator.className='badge success';indicator.textContent='✓';resultText.textContent=CelebrityFaces[0].Name;
+      }catch(err){console.error(err);indicator.className='badge error';indicator.textContent='!';resultText.textContent='Error';}
+    };
+
+    document.getElementById('newBtn').onclick=()=>{indicator.textContent='';video.style.transform='scale(1)';currentScale=baseScale=1;show('s1')};
   </script>
 </body>
 </html>
