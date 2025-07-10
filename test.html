@@ -118,7 +118,16 @@
     let snapshotBlob,actorName,correctShow;
 
     /* Camera */
-    (async()=>{try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});video.srcObject=stream;await video.play();}catch(e){console.error(e)}})();
+    let stream;
+    async function openCamera(){
+      if(stream) return; // already open
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+        video.srcObject = stream;
+        await video.play();
+      }catch(e){ console.error('camera',e); }
+    }
+    openCamera();
 
     /* Zoom */
     let baseScale=1,pinchStart=0,currentScale=1;const active=[];const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
@@ -128,11 +137,11 @@
 
     /* Snap */
     ids('s1').addEventListener('click',async()=>{const w=video.videoWidth||640,h=video.videoHeight||480;canvas.width=w;canvas.height=h;canvas.getContext('2d').drawImage(video,0,0,w,h);snapshotBlob=await new Promise(r=>canvas.toBlob(b=>r(b),'image/jpeg',0.85));preview.src=URL.createObjectURL(snapshotBlob);show('s2');});
-    ids('retakeBtn').onclick=()=>show('s1');
+    ids('retakeBtn').onclick=()=>{show('s1');openCamera();};
 
     /* Identify */
     ids('identifyBtn').onclick=async()=>{show('s3succ');try{const bytes=new Uint8Array(await snapshotBlob.arrayBuffer());const {CelebrityFaces=[]}=await rekognition.send(new RecognizeCelebritiesCommand({Image:{Bytes:bytes}}));if(!CelebrityFaces.length){show('s3fail');return;}actorName=CelebrityFaces[0].Name;show('s3succ');}catch(e){console.error(e);show('s3fail');}};
-    ids('failAgainBtn').onclick=()=>show('s1');
+    ids('failAgainBtn').onclick=()=>{show('s1');openCamera();};
 
     /* Success options */
     ids('quizBtn').onclick=async()=>{await buildQuiz();show('s4quiz');};
@@ -144,7 +153,7 @@
     ids('wrongAgainBtn').onclick=()=>{buildQuiz();show('s4quiz');};
 
     /* Home button */
-    ids('homeBtn').onclick=()=>show('s1');
+    ids('homeBtn').onclick=()=>{show('s1');openCamera();};
 
     /* Google search buttons */
     const openSearch=()=>{if(actorName)window.open(`https://www.google.com/search?q=${encodeURIComponent(actorName)}`,'_blank');};
