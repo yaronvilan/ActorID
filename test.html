@@ -113,12 +113,26 @@
     const screens=['s1','s2','s3fail','s3succ','s4quiz','s5correct','s6wrong','s7reveal'];
     const show = id => screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
 
-    let stream,snapshotBlob,actorName,correctShow;
+    let stream=null,snapshotBlob,actorName,correctShow;
 
     async function openCamera(){
-      if(stream) return;
-      try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});video.srcObject=stream;await video.play();}catch(e){console.error('cam',e);}}
+      try{
+        if(stream){video.srcObject=stream;await video.play();return;}
+        // Prefer rear camera, fallback to any if not available
+        try{
+          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:'environment'}}});
+        }catch(e){
+          stream=await navigator.mediaDevices.getUserMedia({video:true});
+        }
+        video.srcObject=stream;
+        await video.play();
+      }catch(e){console.error('cam',e);} }
     openCamera();
+
+    // Stop stream when page hidden to avoid permission issues
+    document.addEventListener('visibilitychange',()=>{
+      if(document.hidden && stream){stream.getTracks().forEach(t=>t.stop());stream=null;}else if(!document.hidden){openCamera();}
+    });
 
     /* zoom */
     let baseScale=1,pinchStart=0,currentScale=1;const active=[];
@@ -156,25 +170,4 @@
 
     /* success options */
     $('quizBtn').onclick=async()=>{await buildQuiz();show('s4quiz');};
-    $('revealBtn').onclick=async()=>{await buildReveal();show('s7reveal');};
-
-    /* quiz nav */
-    $('quizBack').onclick=()=>show('s3succ');
-    $('newQuizBtn').onclick=()=>{buildQuiz();show('s4quiz');};
-    $('wrongAgainBtn').onclick=()=>{buildQuiz();show('s4quiz');};
-
-    /* home buttons */
-    $('homeBtn').onclick=$('homeBtn2').onclick=()=>{show('s1');openCamera();};
-
-    /* google buttons */
-    const search=()=>{if(actorName)window.open('https://www.google.com/search?q='+encodeURIComponent(actorName),'_blank');};
-    $('viewBtn').onclick=search;$('viewBtn2').onclick=search;$('viewBtn3').onclick=search;
-
-    /* build quiz */
-    async function buildQuiz(){
-      quizQ.textContent=`${actorName} appeared in:`;
-      answersBox.innerHTML='Loading…';
-      try{
-        const res=await fetch(`https://api.themoviedb.org/3/search/person?api_key=${TMDB_KEY}&query=${encodeURIComponent(actorName)}`);
-        const pj=await res.json();const pid=pj.results?.[0]?.id;if(!pid)throw 0;
-        const tv=await fetch(`https://api.themoviedb.org/3/person/${pid}/tv_credits?api_key=${
+    $('revealBtn').onclick=async()=>{await buildReveal();show
