@@ -37,9 +37,10 @@
   <section id="s2" class="screen hidden">
     <h1>Identify an actor</h1>
     <img id="preview" alt="Snapshot">
-    <div style="display:flex;gap:4vw">
+    <div style="display:flex;gap:4vw;flex-wrap:wrap;justify-content:center">
       <button id="retakeBtn" class="secondary">Retake</button>
       <button id="identifyBtn">Identify</button>
+      <button id="askBtn" class="alt">🤔 Ask friend</button>
     </div>
   </section>
 
@@ -178,7 +179,24 @@
     $('viewBtn2').onclick = googleSearch;
     $('viewBtn3').onclick = googleSearch;
 
-    /* quiz nav */
+    /* share photo */
+    $('askBtn').onclick = async () => {
+      if(!snapshotBlob){ return; }
+      try{
+        const file = new File([snapshotBlob], 'actor.jpg', { type: 'image/jpeg' });
+        const shareData = {
+          text: 'Do you remember who this is?',
+          files: [file]
+        };
+        if(navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share(shareData);
+        }else{
+          alert('Sharing not supported on this device');
+        }
+      }catch(err){ console.error('Share error', err); }
+    };
+
+    /* quiz nav */ */
     $('quizBack').onclick  = () => show('s3succ');
     $('newQuizBtn').onclick    = () => { buildQuiz(); show('s4quiz'); };
     $('wrongAgainBtn').onclick = () => { buildQuiz(); show('s4quiz'); };
