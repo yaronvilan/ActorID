@@ -117,7 +117,7 @@
     });
 
     /* TMDB key placeholder */
-    const TMDB_KEY = 'YOUR_TMDB_API_KEY';
+    const TMDB_KEY = '37c64e6294a4e977bc4ecae3de479917';
 
     /* Element refs */
     const ids = id=>document.getElementById(id);
@@ -129,7 +129,7 @@
     const screens=['s1','s2','s3fail','s3succ','s4quiz','s5correct','s6wrong','s7reveal'];
     const show= id => screens.forEach(s=>ids(s).classList.toggle('hidden',s!==id));
 
-    let snapshotBlob,actorName,actorImdbId,correctShow; // state
+    let snapshotBlob,actorName,correctShow; // state
 
     /* open rear camera */
     (async()=>{try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});video.srcObject=stream;await video.play();}catch(e){console.error('cam',e)}})();
@@ -162,7 +162,7 @@
         if(!CelebrityFaces.length){show('s3fail');return;}
         const celeb=CelebrityFaces[0];
         actorName=celeb.Name;
-        actorImdbId=celeb.Id;
+        
         show('s3succ');
       }catch(e){console.error(e);show('s3fail');}
     };
@@ -185,10 +185,12 @@
     ids('wrongAgainBtn').onclick=()=>{buildQuiz();show('s4quiz');};
 
     /* view imdb links */
-    const toImdb=id=>window.open(`https://www.imdb.com/name/${id}/`,'_blank');
-    ids('viewImdbBtn').onclick=()=>toImdb(actorImdbId);
-    ids('viewImdbBtn2').onclick=()=>toImdb(actorImdbId);
-    ids('viewImdbBtn3').onclick=()=>toImdb(actorImdbId);
+    const openSearch = () => {
+      if(actorName) window.open(`https://www.google.com/search?q=${encodeURIComponent(actorName)}`,'_blank');
+    };
+    ids('viewImdbBtn').onclick=openSearch;
+    ids('viewImdbBtn2').onclick=openSearch;
+    ids('viewImdbBtn3').onclick=openSearch;
 
     /* build quiz */
     async function buildQuiz(){
