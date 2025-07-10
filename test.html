@@ -41,8 +41,9 @@
     <h1>Identify an actor</h1>
     <img id="preview" alt="snapshot" />
     <div style="display:flex;gap:4vw">
-      <button id="retakeBtn" class="secondary">Retake</button>
-      <button id="identifyBtn">Identify</button>
+      <button id="viewImdbBtn">🔎 Google</button>
+      <button id="newQuizBtn" class="secondary">🔄 New quiz</button>
+      <button id="homeBtn2" class="alt">🏠 Home</button>
     </div>
   </section>
 
@@ -154,6 +155,7 @@
 
     /* Home button */
     ids('homeBtn').onclick=()=>{show('s1');openCamera();};
+    ids('homeBtn2').onclick=()=>{show('s1');openCamera();};openCamera();};
 
     /* Google search buttons */
     const openSearch=()=>{if(actorName)window.open(`https://www.google.com/search?q=${encodeURIComponent(actorName)}`,'_blank');};
